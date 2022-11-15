@@ -8,15 +8,15 @@ Copyright (C) 2008-2013 Mario Kemper <mario.kemper@gmail.com>
 Copyright (C) 2020-2021 Google LLC, contributed by Alexey Sokolov <sokolov@google.com>
 https://shutter-project.org/
 
-Installation manually available on Ubuntu 22.04 and 22.10
----------------------------------------------------------
+Installation manually available for Ubuntu 22.04 and Ubuntu 22.10
+-----------------------------------------------------------------
 Install standard versione v0.99.2 as usual
 https://shutter-project.org/downloads/
 
 Install gnome screenshot
 sudo apt install gnome-screenshot
 
-Copy bin/shutter_ubuntu from this repo over /usr/bin/shutter (require sudo)
+Copy content of bin/shutter_ubuntu from this repo over /usr/bin/shutter (require sudo)
 
 Shutter on Wayland Motivation
 -----------------------------
@@ -30,8 +30,7 @@ the base idea was to leverage gnome-screenshot command line utility
 while maintaining the very same user interface and behaviour
 want to see the new "Shutter" in action ?
 
-Interested in testing this new version ?
-See the installation instruction above
+https://youtu.be/Jd-MLpj9o84
 
 Maurizio
 
