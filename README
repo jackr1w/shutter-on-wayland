@@ -1,25 +1,42 @@
-Shutter
+Shutter on Wayland
+---------------------------------------------------------
+
+Based on 
+---------------------------------------------------------
+Shutter v0.99.2
 Copyright (C) 2008-2013 Mario Kemper <mario.kemper@gmail.com>
 Copyright (C) 2020-2021 Google LLC, contributed by Alexey Sokolov <sokolov@google.com>
----------------------
 https://shutter-project.org/
 
-Installation
-------------
+Installation manually available on Ubuntu 22.04 and 22.10
+---------------------------------------------------------
+Install standard versione v0.99.2 as usual
 https://shutter-project.org/downloads/
 
-Contact
-------------
-Via E-Mail : https://shutter-project.org/contact/
-Via GitHub : https://github.com/shutter-project/shutter/issues/new/choose
-Via IRC    : ircs://irc.libera.chat:6697/#shutter
+Install gnome screenshot
+sudo apt install gnome-screenshot
 
-Found a bug?
-------------
-https://github.com/shutter-project/shutter/issues/new?labels=bug&template=bug_report.md
+Copy bin/shutter_ubuntu from this repo over /usr/bin/shutter (require sudo)
 
-Shutter Licence
-------------
+Shutter on Wayland Motivation
+-----------------------------
+Hi guys, my name is Maurizio, I'm from Italy
+I'm an IT developer and I like the linux ecosystem
+my primary machine is ubuntu for more than 10 years
+... and I always loved "Shutter" !!!
+this thing that Shutter does not work on Wayland started to bother me a lot
+and so I decide to invest some time to resolve the question
+the base idea was to leverage gnome-screenshot command line utility 
+while maintaining the very same user interface and behaviour
+want to see the new "Shutter" in action ?
+
+Interested in testing this new version ?
+See the installation instruction above
+
+Maurizio
+
+Shutter on Wayland Licence
+--------------------------
 Licence: GPL 3 or (at your option) any later version.
 
 Shutter is free software; you can redistribute it and/or modify it
