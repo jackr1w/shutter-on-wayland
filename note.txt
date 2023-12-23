@@ -1,0 +1,9 @@
+https://unix.stackexchange.com/questions/138188/easily-unpack-deb-edit-postinst-and-repack-deb
+
+mkdir tmp
+dpkg-deb -R original.deb tmp
+# edit DEBIAN/postinst
+dpkg-deb -b tmp fixed.deb
+
+https://earthly.dev/blog/creating-and-hosting-your-own-deb-packages-and-apt-repo/
+
