@@ -15,6 +15,7 @@ Installation available for Ubuntu 23.10
 setfacl -m u:_apt:rx . 
 wget https://github.com/mvivarelli/shutter-on-wayland/raw/master/shutter-on-wayland_0.99.4-6_all.deb
 sudo apt -f install ./shutter-on-wayland_0.99.4-6_all.deb 
+# sometines the first run hungs, this is fixed by a restart
 
 Shutter on Wayland Motivation
 -----------------------------
