@@ -28,8 +28,6 @@
 
 #perl -x -S perltidy -l=0 -b "%f"
 
-use lib "/home/maurizio/perl5/lib/perl5/Perl";
-
 #modules
 #--------------------------------------
 use utf8;
@@ -168,9 +166,9 @@ sub escape_path_string {
 #define constants
 #--------------------------------------
 use constant MAX_ERROR       => 5;
-use constant SHUTTER_REV     => 'Rev.1593';
+use constant SHUTTER_REV     => 'Rev.1608';
 use constant SHUTTER_NAME    => 'Shutter';
-use constant SHUTTER_VERSION => '0.99.2';
+use constant SHUTTER_VERSION => '0.99.4';
 
 #--------------------------------------
 
@@ -466,12 +464,22 @@ sub STARTUP {
 	$window->set_default_size(-1, 500);
 
 	#UPDATE WINDOW LIST (signal is connected when GUI is loaded)
-	my $wnck_screen = Wnck::Screen::get_default();
-	$wnck_screen->force_update if $wnck_screen;
-	my $x11_supported = $wnck_screen ? 1 : 0;
+
+	my $x11_supported = 1;
+	if ($ENV{XDG_SESSION_TYPE} eq "wayland") {
+		$x11_supported = 0;
+	}
+
+	my $wnck_screen;
+	if ($x11_supported) {
+		$wnck_screen = Wnck::Screen::get_default();
+		$wnck_screen->force_update if $wnck_screen;
+	}
 
 	#TRAY ICON AND MENU
 	my $tray      = undef;
+	my $tray_libappindicator = undef;
+	my $tray_legacy = undef;
 	my $tray_menu = fct_ret_tray_menu();
 
 	#SESSION NOTEBOOK
@@ -653,35 +661,13 @@ sub STARTUP {
 	#--------------------------------------
 	#command line param set to disable tray icon?
 	unless ($sc->get_disable_systray) {
-
-		$tray = Gtk3::StatusIcon->new();
-		$tray->set_from_icon_name("shutter-panel");
-		$tray->set_visible(1);
-
-		fct_update_gui();
-
-		if ($tray->is_embedded) {
-			$tray->{'hid'} = $tray->signal_connect(
-				'popup-menu' => sub { evt_show_systray_statusicon(@_); },
-				$tray
-			);
-			$tray->{'hid2'} = $tray->signal_connect(
-				'activate' => sub {
-					evt_activate_systray_statusicon(@_);
-					$tray;
-				},
-				$tray
-			);
-		} else {
-			$tray = undef;
-		}
-
-		if ($appindicator && !defined $tray) {
-			# Fallback to AppIndicator. This one doesn't allow left-click signal, but it seems to be the only option for Gnome on Ubuntu 21.04...
-			$tray = AppIndicator::Indicator->new("Shutter", "shutter-panel", 'application-status');
-			$tray->set_menu($tray_menu);
-			$tray->set_status('active');
-		}
+		fct_try_init_tray();
+		Glib::Timeout->add(10000, sub {
+			if (!$tray_legacy || !$tray_legacy->is_embedded) {
+				fct_try_init_tray();
+			}
+			return TRUE;
+		});
 	}
 
 	#--------------------------------------
@@ -876,8 +862,6 @@ sub STARTUP {
 	$st->{_upload}->signal_connect('clicked' => \&fct_upload);
 	$st->{_upload}->set_sensitive(FALSE);
 
-	#maurizio
-	#unless ($x11_supported) {
 	unless (FALSE) {
 		my $tooltip = $d->get("Can't take screenshots without X11 server");
 		for my $name ('_select', '_window', '_menu', '_tooltip') {
@@ -896,7 +880,7 @@ sub STARTUP {
 	my $combobox_settings_profiles = Gtk3::ComboBoxText->new;
 	my @current_profiles;
 	my $current_index = 0;
-	foreach my $pfile (sort bsd_glob("$ENV{'HOME'}/.shutter/profiles/*.xml")) {
+	foreach my $pfile (sort +bsd_glob("$ENV{'HOME'}/.shutter/profiles/*.xml")) {
 		utf8::decode $pfile;
 		next
 			if $pfile =~ /\_accounts.xml/;    #accounts file - we are looking for "real" profiles
@@ -1083,35 +1067,10 @@ sub STARTUP {
 		$filename->set_text("\$name_\%NNN");
 	}
 
-	#do some input validation
-	#here are all invalid char codes
-	my @invalid_codes = (47, 92, 63, 42, 58, 124, 34, 60, 62, 44, 59, 35, 38);
 	my $filename_hint = Gtk3::Label->new;
 	$filename_hint->set_no_show_all(TRUE);
-	$filename->signal_connect(
-		'key-press-event' => sub {
-			my $filename = shift;
-			my $event    = shift;
 
-			my $input = Gtk3::Gdk::keyval_to_unicode($event->keyval);
-
-			#invalid input
-			#~ print $input."\n";
-			if (grep($input == $_, @invalid_codes)) {
-				my $char = chr($input);
-				$char = 'amp();' if $char eq '&';
-				$filename_hint->set_markup("<span size='small'>" . sprintf($d->get("Reserved character %s is not allowed to be in a filename."), "'" . $char . "'") . "</span>");
-
-				$filename_hint->show;
-				return TRUE;
-			} else {
-
-				#clear possible message when valid char is entered
-				$filename_hint->set_markup("<span size='small'></span>");
-				$filename_hint->hide;
-				return FALSE;
-			}
-		});
+	fct_validate_filename($filename, $filename_hint);
 
 	my $filename_tooltip_string =
 		$d->get("There are several wildcards available, like\n")
@@ -2982,8 +2941,6 @@ sub STARTUP {
 			#unblock signal handler
 			fct_control_signals('unblock');
 			return TRUE;
-		# maurizio
-		#} elsif (!$x11_supported && $data ne "full" && $data ne "tray_full") {
 		} elsif (FALSE && $data ne "full" && $data ne "tray_full") {
 			my $sd = Shutter::App::SimpleDialogs->new;
 			$sd->dlg_error_message($d->get("Can't take screenshots without X11 server"), $d->get("Failed"));
@@ -3079,10 +3036,8 @@ sub STARTUP {
 			Glib::Timeout->add(
 				$hide_time->get_value,
 				sub {
-					#maurizio
 					if ($x11_supported) {
-						#fct_take_screenshot($widget, $data, $folder_from_config, $extra);
-						fct_gnome_screenshot($widget, $data, $folder_from_config, $extra);
+						fct_take_screenshot($widget, $data, $folder_from_config, $extra);
 					}
 					else {
 						fct_gnome_screenshot($widget, $data, $folder_from_config, $extra);
@@ -3898,7 +3853,7 @@ sub STARTUP {
 			unless ($shf->file_exists("$ENV{'HOME'}/.shutter/profiles/" . $active_text . ".xml")
 				|| $shf->file_exists("$ENV{'HOME'}/.shutter/profiles/" . $active_text . "_accounts.xml"))
 			{
-				$combobox_settings_profiles->remove_text($active_index);
+				$combobox_settings_profiles->remove($active_index);
 				$combobox_settings_profiles->set_active($combobox_settings_profiles->get_active + 1);
 				$current_profile_indx = $combobox_settings_profiles->get_active;
 
@@ -3938,6 +3893,49 @@ sub STARTUP {
 
 	#functions
 	#--------------------------------------
+
+	sub fct_try_init_tray {
+		$tray_legacy = Gtk3::StatusIcon->new();
+		$tray_legacy->set_from_icon_name("shutter-panel");
+		$tray_legacy->set_visible(1);
+
+		fct_update_gui();
+
+		if ($tray_legacy->is_embedded) {
+			if ($tray_libappindicator) {
+				$tray_libappindicator->set_status('passive');
+				$tray_libappindicator = undef;
+			}
+			$tray = $tray_legacy;
+			$tray->{'hid'} = $tray->signal_connect(
+				'popup-menu' => sub { evt_show_systray_statusicon(@_); },
+				$tray
+			);
+			$tray->{'hid2'} = $tray->signal_connect(
+				'activate' => sub {
+					evt_activate_systray_statusicon(@_);
+					$tray;
+				},
+				$tray
+			);
+		} else {
+			$tray_legacy->set_visible(0);
+			$tray_legacy = undef;
+
+			if ($appindicator && !$tray_libappindicator) {
+				# Fallback to AppIndicator. This one doesn't allow left-click signal, but it seems to be the only option for Gnome on Ubuntu 21.04...
+				$tray_libappindicator = AppIndicator::Indicator->new("Shutter", "shutter-panel", 'application-status');
+				$tray_libappindicator->set_menu($tray_menu);
+				$tray_libappindicator->set_status('active');
+			}
+
+			if ($tray_libappindicator) {
+				$tray = $tray_libappindicator;
+			} else {
+				$tray = undef;
+			}
+		}
+	}
 
 	sub fct_create_session_notebook {
 
@@ -4744,7 +4742,7 @@ sub STARTUP {
 					$filename->set_text($settings_xml->{'general'}->{'filename'});
 
 					utf8::decode $settings_xml->{'general'}->{'folder'};
-					$saveDir_button->set_current_folder($settings_xml->{'general'}->{'folder'});
+					$saveDir_button->set_filename($settings_xml->{'general'}->{'folder'});
 
 					$save_auto_active->set_active($settings_xml->{'general'}->{'save_auto'});
 					$save_ask_active->set_active($settings_xml->{'general'}->{'save_ask'});
@@ -4965,6 +4963,11 @@ sub STARTUP {
 
 		#get applications
 		my $apps = Glib::IO::AppInfo::get_recommended_for_type('image/png');
+
+		# $apps is undefined if Glib::IO::AppInfo::get_recommended_for_type fails
+		unless (defined $apps) {
+			return $model;
+		}
 
 		#no apps determined!
 		unless (scalar @$apps) {
@@ -5608,6 +5611,33 @@ sub STARTUP {
 		return TRUE;
 	}
 
+	sub fct_validate_filename{
+		my $myfilename	= shift;
+		my $myfilename_hint	= shift;
+		my @invalid_codes = (47, 92);
+		$myfilename->signal_connect(
+			'key-press-event' => sub {
+				shift;
+				my $event = shift;
+
+				my $input = Gtk3::Gdk::keyval_to_unicode($event->keyval);
+
+				#invalid input
+				#~ print $input."\n";
+				if (grep($input == $_, @invalid_codes)) {
+					my $char = chr($input);
+					$char = 'amp();' if $char eq '&';
+					$myfilename_hint->set_markup("<span size='small'>" . sprintf($d->get("Reserved character %s is not allowed to be in a filename."), "'" . $char . "'") . "</span>");
+					return TRUE;
+				} else {
+
+					#clear possible message when valid char is entered
+					$myfilename_hint->set_markup("<span size='small'></span>");
+					return FALSE;
+				}
+			});
+	}
+
 	sub fct_undo {
 
 		my $key = fct_get_current_file();
@@ -5867,17 +5897,6 @@ sub STARTUP {
 
 		#~ &fct_control_main_window ('show');
 
-		my $widget;
-		#image_autocopy to clipboard if configured
-		if ($image_autocopy_active->get_active()) {
-			fct_clipboard($widget, 'image');
-		}
-
-		#filename autocopy to clipboard if configured
-		if ($fname_autocopy_active->get_active()) {
-			fct_clipboard($widget, 'text');
-		}		
-
 		return TRUE;
 	}
 
@@ -5956,11 +5975,11 @@ sub STARTUP {
 			}
 		}
 
-		#..replace wildcards by values
-		$filename_value = $data." %y-%m-%d %H-%M-%S";
-		$filename_value = strftime $filename_value, localtime;
+			#..replace wildcards by values
+			$filename_value = $data." %y-%m-%d %H-%M-%S";
+			$filename_value = strftime $filename_value, localtime;
 
-		#...and get next filename
+			#...and get next filename
 		my $giofile = fct_get_next_filename($filename_value, $folder, $filetype_value);
 
 		my $fn = $shf->utf8_decode(unescape_string($giofile->get_path));
@@ -5991,11 +6010,10 @@ sub STARTUP {
 		my @newfile = ("file://$fn");
 		fct_open_files(@newfile);
 
-		# autocopy after short timeout
+		#image_autocopy to clipboard if configured
 		Glib::Timeout->add(
 			$hide_time->get_value,
 			sub {
-				#image_autocopy to clipboard if configured
 				if ($image_autocopy_active->get_active()) {
 					fct_clipboard($widget, 'image');
 				}
@@ -6006,6 +6024,8 @@ sub STARTUP {
 				}
 			});
 
+
+
 		#Exit Shutter after the first capture has been made.
 		#This is useful when using Shutter in scripts.
 		if ($sc->get_exit_after_capture) {
@@ -6014,7 +6034,7 @@ sub STARTUP {
 
 		return TRUE;
 	}
-
+	
 	sub fct_take_screenshot {
 		my ($widget, $data, $folder_from_config, $extra) = @_;
 
@@ -7325,14 +7345,14 @@ sub STARTUP {
 			#tray menu
 			foreach my $child ($tray_menu->get_children) {
 				if ($child->get_name eq 'quicks') {
-					$child->remove_submenu;
+					$child->set_submenu(undef);
 					$child->set_sensitive(FALSE);
 					last;
 				}
 			}
 
 			#main menu
-			$sm->{_menuitem_quicks}->remove_submenu;
+			$sm->{_menuitem_quicks}->set_submenu(undef);
 			$sm->{_menuitem_quicks}->set_sensitive(FALSE);
 
 			#and statusbar
@@ -7878,6 +7898,13 @@ sub STARTUP {
 
 		print "Parsing wildcards for $screenshot_name\n"
 			if $sc->get_debug;
+		
+		# $screenshot is undefined if the selection width or height is zero 
+		unless ($screenshot) {
+			my $response = $sd->dlg_error_message($d->get("Error: selection width or height is zero, please retry!"), $d->get("Failed"));
+			fct_control_main_window('show');
+			return FALSE;
+		}
 
 		#parse width and height
 		my $swidth  = $screenshot->get_width;
@@ -8029,13 +8056,10 @@ sub STARTUP {
 			my $existing_filename = $filename_value;
 			while ($new_giofile->query_exists) {
 				$filename_value = $existing_filename . "(" . sprintf("%03d", $count++) . ")";
-				#maurizio bug
-				#$new_giofile    = Glib::IO::File::new_for_path($folder);
-				#$new_giofile    = $new_giofile->append_string("$filename_value.$filetype_value");
-				$new_giofile = Glib::IO::File::new_for_path("$folder/$filename_value.$filetype_value");
-				#maurizio bug
-				#print "Checking new uri: " . $new_giofile->to_string . "\n"
-				#	if $sc->get_debug;
+				$new_giofile    = Glib::IO::File::new_for_path($folder);
+				$new_giofile    = $new_giofile->append_string("$filename_value.$filetype_value");
+				print "Checking new uri: " . $new_giofile->to_string . "\n"
+					if $sc->get_debug;
 			}
 		}
 
@@ -8340,6 +8364,9 @@ sub STARTUP {
 		my $init = shift;
 
 		my $menu_wrksp = Gtk3::Menu->new;
+		unless ($x11_supported) {
+			return $menu_wrksp;
+		}
 
 		my $wnck_screen = Wnck::Screen::get_default();
 		unless ($wnck_screen) {
@@ -8780,6 +8807,13 @@ sub STARTUP {
 		# https://developer.gnome.org/gio/stable/GAppInfo.html
 		my $apps = Glib::IO::AppInfo::get_recommended_for_type($mime_type);
 
+		# $apps is undefined if Glib::IO::AppInfo::get_recommended_for_type fails
+		unless (defined $apps) {
+			$sm->{_menuitem_reopen}->set_sensitive(FALSE);
+			$sm->{_menuitem_large_reopen}->set_sensitive(FALSE);
+			return $menu_programs;
+		}
+
 		#no apps determined!
 		unless (scalar @$apps) {
 			$sm->{_menuitem_reopen}->set_sensitive(FALSE);
@@ -8935,7 +8969,7 @@ sub STARTUP {
 		my $group   = undef;
 		my $counter = 0;
 		foreach my $profile (@{$current_profiles_ref}) {
-			my $profile_item = Gtk3::RadioMenuItem::new($group, $profile);
+			my $profile_item = Gtk3::RadioMenuItem->new_with_label($group, $profile);
 			$profile_item->set_active(TRUE)
 				if $profile eq $combobox_settings_profiles->get_active_text;
 			$profile_item->signal_connect(
@@ -9215,10 +9249,9 @@ sub STARTUP {
 	sub fct_init_depend {
 
 		#imagemagick/perlmagick
-		#MAURIZIO
-		#unless (File::Which::which('convert')) {
-		#	die "ERROR: imagemagick is missing --> aborting!\n\n";
-		#}
+		unless (File::Which::which('convert')) {
+			die "ERROR: imagemagick is missing --> aborting!\n\n";
+		}
 
 		#gnome-web-photo
 		unless (File::Which::which('gnome-web-photo')) {
@@ -9348,6 +9381,11 @@ sub STARTUP {
 		print "\nINFO: gathering system information...";
 		print "\n";
 		print "\n";
+		print "Shutter ";
+		print SHUTTER_VERSION;
+		print ' ';
+		print SHUTTER_REV;
+		print "\n";
 
 		#kernel info
 		if (File::Which::which('uname')) {
@@ -9410,29 +9448,7 @@ sub STARTUP {
 			my $new_filename      = Gtk3::Entry->new();
 			$new_filename->set_activates_default(TRUE);
 
-			#here are all invalid char codes
-			my @invalid_codes = (47, 92, 63, 37, 42, 58, 124, 34, 60, 62, 44, 59, 35, 38);
-			$new_filename->signal_connect(
-				'key-press-event' => sub {
-					my $new_filename = shift;
-					my $event        = shift;
-
-					my $input = Gtk3::Gdk::keyval_to_unicode($event->keyval);
-
-					#invalid input
-					#~ print $input."\n";
-					if (grep($input == $_, @invalid_codes)) {
-						my $char = chr($input);
-						$char = 'amp();' if $char eq '&';
-						$new_filename_hint->set_markup("<span size='small'>" . sprintf($d->get("Reserved character %s is not allowed to be in a filename."), "'" . $char . "'") . "</span>");
-						return TRUE;
-					} else {
-
-						#clear possible message when valid char is entered
-						$new_filename_hint->set_markup("<span size='small'></span>");
-						return FALSE;
-					}
-				});
+			fct_validate_filename($new_filename, $new_filename_hint);
 
 			#parse filename
 			my ($short, $folder, $ext) = fileparse($session_screens{$key}->{'long'}, qr/\.[^.]*/);
@@ -10900,29 +10916,7 @@ sub STARTUP {
 		my $new_profile_name      = Gtk3::Entry->new();
 		$new_profile_name->set_activates_default(TRUE);
 
-		#here are all invalid char codes
-		my @invalid_codes = (47, 92, 63, 37, 42, 58, 124, 34, 60, 62, 44, 59, 35, 38);
-		$new_profile_name->signal_connect(
-			'key-press-event' => sub {
-				my $new_profile_name = shift;
-				my $event            = shift;
-
-				my $input = Gtk3::Gdk::keyval_to_unicode($event->keyval);
-
-				#invalid input
-				#~ print $input."\n";
-				if (grep($input == $_, @invalid_codes)) {
-					my $char = chr($input);
-					$char = 'amp();' if $char eq '&';
-					$new_profile_name_hint->set_markup("<span size='small'>" . sprintf($d->get("Reserved character %s is not allowed to be in a filename."), "'" . $char . "'") . "</span>");
-					return TRUE;
-				} else {
-
-					#clear possible message when valid char is entered
-					$new_profile_name_hint->set_markup("<span size='small'></span>");
-					return FALSE;
-				}
-			});
+		fct_validate_filename($new_profile_name, $new_profile_name_hint);
 
 		#show name of current profile
 		$new_profile_name->set_text($curr_profile_name)
