@@ -10,6 +10,8 @@ https://shutter-project.org/
 
 Installation available for Ubuntu 23.10
 -----------------------------------------------------------------
+# remove standard package if present
+# sudo apt remove shutter
 wget https://github.com/mvivarelli/shutter-on-wayland/blob/master/shutter-on-wayland_0.99.4-5_all.deb
 sudo apt -f install ./shutter-on-wayland_0.99.4-5_all.deb 
 
