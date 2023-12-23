@@ -10,7 +10,8 @@ https://shutter-project.org/
 
 Installation manually available for Ubuntu 23.10
 -----------------------------------------------------------------
-
+wget https://github.com/mvivarelli/shutter-on-wayland/blob/master/shutter-on-wayland_0.99.2-5_all.deb
+sudo apt -f install ./shutter-on-wayland_0.99.2-5_all.deb 
 
 Shutter on Wayland Motivation
 -----------------------------
