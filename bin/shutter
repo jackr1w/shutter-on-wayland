@@ -4528,6 +4528,7 @@ sub STARTUP {
 		$settings{'general'}->{'delay'}          = $delay->get_value();
 
 		#wrksp -> submenu
+		$current_monitor_active = Gtk3::CheckMenuItem->new_with_label($d->get("Limit to current monitor"));
 		$settings{'general'}->{'current_monitor_active'} = $current_monitor_active->get_active;
 
 		#determining timeout
@@ -4762,6 +4763,7 @@ sub STARTUP {
 					$settings_xml->{'general'}->{'folder_force'} = TRUE;
 
 					#wrksp -> submenu
+					$current_monitor_active = Gtk3::CheckMenuItem->new_with_label($d->get("Limit to current monitor"));
 					$current_monitor_active->set_active($settings_xml->{'general'}->{'current_monitor_active'});
 
 					#determining timeout
