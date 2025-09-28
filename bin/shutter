@@ -866,10 +866,10 @@ sub STARTUP {
 		my $tooltip = $d->get("Can't take screenshots without X11 server");
 		for my $name ('_select', '_window', '_menu', '_tooltip') {
 			$st->{$name}->set_sensitive(FALSE);
-			$st->{$name}->set_tooltip_text($tooltip);
+			#$st->{$name}->set_tooltip_text($tooltip);
 		}
 		for my $name ('_full', '_window') {
-			$st->{$name}->set_arrow_tooltip_text($tooltip);
+			#$st->{$name}->set_arrow_tooltip_text($tooltip);
 		}
 	}
 
