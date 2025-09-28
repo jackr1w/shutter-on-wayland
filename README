@@ -8,14 +8,19 @@ Copyright (C) 2008-2013 Mario Kemper <mario.kemper@gmail.com>
 Copyright (C) 2020-2021 Google LLC, contributed by Alexey Sokolov <sokolov@google.com>
 https://shutter-project.org/
 
-Installation available for Ubuntu 23.10
+Installation available for Ubuntu 23.10+
 -----------------------------------------------------------------
 # remove standard package if present
 # sudo apt remove shutter
 setfacl -m u:_apt:rx . 
-wget https://github.com/mvivarelli/shutter-on-wayland/raw/master/shutter-on-wayland_0.99.4-6_all.deb
-sudo apt -f install ./shutter-on-wayland_0.99.4-6_all.deb 
+wget https://github.com/jack_r1w/shutter-on-wayland/raw/master/shutter-on-wayland_0.99.4-7_all.deb
+sudo apt -f install ./shutter-on-wayland_0.99.4-7_all.deb 
+
+-- not sure if relevant anymore --
 # sometines the first run hungs, this is fixed by a restart
+
+Original comment left below
+===========================
 
 Shutter on Wayland Motivation
 -----------------------------
