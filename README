@@ -3,10 +3,12 @@ Shutter on Wayland
 
 Based on 
 ---------------------------------------------------------
-Shutter v0.99.4
-Copyright (C) 2008-2013 Mario Kemper <mario.kemper@gmail.com>
-Copyright (C) 2020-2021 Google LLC, contributed by Alexey Sokolov <sokolov@google.com>
-https://shutter-project.org/
+* Shutter v0.99.4
+  Copyright (C) 2008-2013 Mario Kemper <mario.kemper@gmail.com>
+  Copyright (C) 2020-2021 Google LLC, contributed by Alexey Sokolov <sokolov@google.com>
+  https://shutter-project.org/
+* Shutter-on-Wayland by Maurizio
+  https://github.com/mvivarelli/shutter-on-wayland
 
 Installation available for Ubuntu 23.10+
 -----------------------------------------------------------------
